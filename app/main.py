@@ -1,19 +1,42 @@
-import json
 import joblib
 import pandas as pd
+from mangum import Mangum
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
 
-def lambda_handler(event, context):
-    # Extract input data from the request body    
-    input = event['input']
+class Item(BaseModel):
+    input: list[int]
 
+
+app = FastAPI()
+
+origins = ["*"]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.get("/")
+def read_root():
+    return {"message": "Hello from backend!"}
+
+
+@app.post("/predict")
+def read_item(request: Item):
     # Load the saved model from the pickle file
     loaded_lr_model = joblib.load('models/linear_regression.pkl')
     loaded_rf_model = joblib.load('models/random_forest.pkl')
     loaded_gb_model = joblib.load('models/gradient_boosting.pkl')
 
     # Using the loaded model for prediction
-    X = pd.DataFrame([input], columns=["brand", "ram", "ssd", "hdd",
+    X = pd.DataFrame([request.input], columns=["brand", "ram", "ssd", "hdd",
                      "no_of_cores", "no_of_threads", "cpu_brand", "gpu_brand", "screen_size", "screen_resolution", "os"])
 
     y_pred_lr = loaded_lr_model.predict(X)
@@ -27,9 +50,8 @@ def lambda_handler(event, context):
     }
 
     return {
-        'statusCode': 200,
-        'body': json.dumps({'results': json.dumps(results)})
+        "results": results
     }
-    
-handler = lambda_handler
 
+
+handler = Mangum(app)
